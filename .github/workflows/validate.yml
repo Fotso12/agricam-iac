@@ -1,0 +1,86 @@
+# .github/workflows/validate.yml
+name: Validation et Securite IaC
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  TF_VERSION: '1.7.5'
+  WORKING_DIR: 'environnements/prod'
+
+jobs:
+  validation-syntaxe:
+    name: Validation syntaxe Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format (verifie le formatage)
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Terraform Init (sans backend pour la validation)
+        run: terraform init -backend=false
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ env.WORKING_DIR }}
+
+  scan-securite:
+    name: Scan de securite Checkov
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation Checkov
+        run: pip install checkov
+
+      - name: Scan Checkov (bloque si CRITICAL)
+        run: |
+          checkov -d . \
+            --framework terraform \
+            --check CKV_AWS_19 \
+            --check CKV_AWS_20 \
+            --check CKV_AWS_24 \
+            --check CKV_AWS_57 \
+            --check CKV2_AWS_11 \
+            --check CKV_AWS_8 \
+            --output cli \
+            --output junitxml \
+            --output-file-path checkov_results.xml
+
+      - name: Upload des resultats Checkov
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkov-results
+          path: checkov_results.xml
+
+  tflint:
+    name: TFLint - Meilleures pratiques
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation tflint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: Initialisation tflint
+        run: tflint --init
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Execution tflint
+        run: tflint --recursive
+        working-directory: ${{ env.WORKING_DIR }}

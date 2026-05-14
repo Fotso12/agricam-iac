@@ -1,0 +1,67 @@
+# .github/workflows/drift-detection.yml
+name: Detection de Derive Quotidienne
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Tous les jours a 02h00 UTC
+  workflow_dispatch:
+
+env:
+  TF_VERSION: '1.7.5'
+  WORKING_DIR: 'environnements/prod'
+
+jobs:
+  detection-derive:
+    name: Detection de derive de configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Installation Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Detection de derive (terraform plan)
+        id: drift
+        run: |
+          set +e
+          terraform plan \
+            -var="db_password=${{ secrets.TF_VAR_DB_PASSWORD }}" \
+            -detailed-exitcode 2>&1 | tee drift_report.txt
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          exit 0
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Alerte si derive detectee
+        if: steps.drift.outputs.exit_code == '2'
+        run: |
+          echo '::error::DERIVE DETECTEE ! L infrastructure reelle diverge du code Terraform.'
+          echo '::error::Consultez le rapport de derive dans les artefacts.'
+          cat drift_report.txt
+          exit 1
+
+      - name: Confirmation - Pas de derive
+        if: steps.drift.outputs.exit_code == '0'
+        run: echo '::notice::Aucune derive detectee. Infrastructure conforme au code.'
+
+      - name: Sauvegarde du rapport
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drift-report-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}/drift_report.txt

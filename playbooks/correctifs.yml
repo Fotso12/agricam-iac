@@ -1,0 +1,42 @@
+# playbooks/correctifs.yml
+# Usage : ansible-playbook -i inventaire.ini playbooks/correctifs.yml
+
+---
+- name: Application des correctifs de securite AgriCam
+  hosts: serveurs_web
+  become: yes
+  vars:
+    reboot_timeout: 300
+
+  tasks:
+    - name: Mise a jour du cache apt
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Application des correctifs de securite uniquement
+      ansible.builtin.apt:
+        upgrade: dist
+        only_upgrade: yes
+      register: upgrade_result
+
+    - name: Affichage des paquets mis a jour
+      ansible.builtin.debug:
+        msg: "Paquets mis a jour : {{ upgrade_result.stdout_lines | default([]) }}"
+
+    - name: Verification si redemarrage necessaire
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_needed
+
+    - name: Redemarrage si necessaire
+      ansible.builtin.reboot:
+        reboot_timeout: "{{ reboot_timeout }}"
+        msg: "Redemarrage pour application des correctifs"
+      when: reboot_needed.stat.exists
+
+    - name: Verification post-redemarrage — Nginx actif
+      ansible.builtin.service:
+        name: nginx
+        state: started
+      when: reboot_needed.stat.exists

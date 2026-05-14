@@ -1,0 +1,40 @@
+# ── Fichiers d'etat Terraform (peuvent contenir des secrets) ──────
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# ── Fichiers de variables avec valeurs sensibles ───────────────────
+*.tfvars
+!exemple.tfvars          # Exception : le fichier exemple est versionne
+
+# ── Plans Terraform (peuvent contenir des valeurs sensibles) ───────
+tfplan
+*.tfplan
+
+# ── Cles SSH et certificats ────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+
+# ── Variables d'environnement ──────────────────────────────────────
+.env
+.env.*
+!.env.exemple
+
+# ── Fichiers de credentials AWS ────────────────────────────────────
+credentials
+.aws/
+
+# ── Logs et fichiers temporaires ───────────────────────────────────
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# ── Outils de securite (resultats de scan) ─────────────────────────
+checkov_results.xml
+drift_report.txt
