@@ -5,4 +5,8 @@ variable "suffix" {
   description = "Suffixe unique pour les noms de buckets S3"
   type        = string
 }
+variable "aws_region" {
+  description = "La région AWS utilisée"
+  type        = string
+}
 
