@@ -2,26 +2,47 @@ data "aws_caller_identity" "current" {}
 
 # --- Clé KMS pour le chiffrement global ---
 resource "aws_kms_key" "main" {
-  description             = "Cle KMS pour AgriCam (S3, CloudTrail)"
+  description             = "Cle KMS pour AgriCam (S3, CloudTrail, Logs)"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "Enable IAM User Permissions"
-        Effect    = "Allow"
-        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
-        Action    = "kms:*"
-        # CKV_AWS_356 : Autoriser l'accès complet uniquement aux admins du compte via l'IAM root
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        # Cette section donne au compte Root le contrôle total pour éviter le verrouillage (Safety Check)
+        Principal = { 
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" 
+        }
+        Action   = "kms:*"
         Resource = "*"
       },
       {
-        Sid       = "Allow CloudTrail to encrypt logs"
-        Effect    = "Allow"
+        Sid    = "Allow CloudTrail to encrypt logs"
+        Effect = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action    = "kms:GenerateDataKey*"
-        Resource  = "*"
+        Action   = [
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow CloudWatch Logs to use the key"
+        Effect = "Allow"
+        Principal = { 
+          Service = "logs.${var.region}.amazonaws.com" 
+        }
+        Action = [
+          "kms:Encrypt*",
+          "kms:Decrypt*",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:Describe*"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -29,8 +50,6 @@ resource "aws_kms_key" "main" {
 
 # --- Bucket S3 Stockage ---
 resource "aws_s3_bucket" "stockage" {
-  # checkov:skip=CKV_AWS_144: Pas de réplication inter-région nécessaire
-  # checkov:skip=CKV2_AWS_62: Pas de notifications d'événements requises
   bucket = "${var.projet}-stockage-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-stockage-${var.environnement}" }
 }
@@ -60,7 +79,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "stockage" {
       days          = 30
       storage_class = "STANDARD_IA"
     }
-    # CKV_AWS_300 : Nettoyage des uploads interrompus
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -83,32 +101,23 @@ resource "aws_s3_bucket_public_access_block" "stockage" {
 
 # --- Bucket S3 pour les logs ---
 resource "aws_s3_bucket" "logs" {
-  # checkov:skip=CKV_AWS_144: Archive locale suffisante
-  # checkov:skip=CKV2_AWS_62: Pas de trigger nécessaire sur les logs
-  # checkov:skip=CKV_AWS_18: Pas de logging récursif sur le bucket de logs lui-même
   bucket = "${var.projet}-cloudtrail-logs-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-cloudtrail-logs-${var.environnement}", Type = "Logs" }
 }
 
-# Correction CKV2_AWS_61 : Ajout d'une configuration de cycle de vie pour le bucket de logs
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   bucket = aws_s3_bucket.logs.id
   rule {
     id     = "log-retention-policy"
     status = "Enabled"
     filter {}
-
-    # Déplacer vers un stockage moins coûteux après 90 jours
     transition {
       days          = 90
       storage_class = "GLACIER"
     }
-
-    # Nettoyage automatique après 365 jours
     expiration {
       days = 365
     }
-
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -167,9 +176,7 @@ resource "aws_s3_bucket_policy" "logs" {
 # --- CloudWatch Logs pour CloudTrail ---
 resource "aws_cloudwatch_log_group" "trail" {
   name = "/aws/cloudtrail/${var.projet}-audit"
-  # CKV_AWS_338 : Rétention augmentée à 1 an
   retention_in_days = 365
-  # CKV_AWS_158 : Chiffrement KMS ajouté
   kms_key_id = aws_kms_key.main.arn
 }
 
@@ -187,16 +194,13 @@ resource "aws_cloudtrail" "audit" {
   sns_topic_name             = aws_sns_topic.trail_alerts.name
   cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.trail.arn}:*"
   cloud_watch_logs_role_arn  = aws_iam_role.trail_to_cw.arn
-
   is_multi_region_trail         = true
   enable_log_file_validation    = true
   include_global_service_events = true
-
   event_selector {
     read_write_type           = "All"
     include_management_events = true
   }
-
   depends_on = [aws_s3_bucket_policy.logs]
   tags       = { Type = "Securite" }
 }
