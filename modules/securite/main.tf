@@ -32,6 +32,16 @@ resource "aws_kms_key" "main" {
         Resource = "*"
       },
       {
+        Sid    = "Allow CloudTrail to use KMS for SNS"
+        Effect = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action = [
+          "kms:GenerateDataKey*",
+          "kms:Decrypt"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "Allow CloudWatch Logs to use the key"
         Effect = "Allow"
         Principal = {
