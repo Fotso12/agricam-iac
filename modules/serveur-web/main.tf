@@ -1,6 +1,23 @@
+# --- Recherche dynamique de l'AMI la plus récente ---
+data "aws_ami" "amazon_linux_2" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 # --- Instance EC2 ---
 resource "aws_instance" "web" {
-  ami                    = var.ami_id
+  # Utilisation de l'ID dynamique pour éviter l'erreur InvalidAMIID.Malformed
+  ami                    = data.aws_ami.amazon_linux_2.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
@@ -11,16 +28,16 @@ resource "aws_instance" "web" {
   # CKV_AWS_135 : Optimisation EBS
   ebs_optimized = true
 
-  # Modification ici pour injecter ton fichier index.html
+  # Script d'initialisation pour Nginx et le contenu HTML
   user_data = <<-EOT
     #!/bin/bash
-    apt-get update -y
-    apt-get install -y nginx amazon-ssm-agent
-    systemctl enable nginx amazon-ssm-agent
-    systemctl start nginx amazon-ssm-agent
+    yum update -y
+    amazon-linux-extras install nginx1 -y
+    systemctl enable nginx
+    systemctl start nginx
     
     # On injecte le contenu du fichier index.html situé dans le même dossier
-    cat <<EOF > /var/www/html/index.html
+    cat <<EOF > /usr/share/nginx/html/index.html
     ${file("${path.module}/index.html")}
     EOF
   EOT
