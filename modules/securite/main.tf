@@ -54,6 +54,9 @@ resource "aws_kms_key" "main" {
 resource "aws_s3_bucket" "stockage" {
   bucket = "${var.projet}-stockage-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-stockage-${var.environnement}" }
+
+  # checkov:skip=CKV_AWS_144:La réplication cross-region n'est pas requise pour AgriCam
+  # checkov:skip=CKV2_AWS_62:Les notifications d'événements ne sont pas nécessaires pour ce cas d'usage
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "stockage" {
@@ -105,6 +108,9 @@ resource "aws_s3_bucket_public_access_block" "stockage" {
 resource "aws_s3_bucket" "logs" {
   bucket = "${var.projet}-cloudtrail-logs-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-cloudtrail-logs-${var.environnement}", Type = "Logs" }
+
+  # checkov:skip=CKV_AWS_144:Bucket de logs local uniquement pour archivage
+  # checkov:skip=CKV2_AWS_62:Pas de traitement automatisé des logs S3 prévu
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
@@ -188,7 +194,7 @@ resource "aws_sns_topic" "trail_alerts" {
   kms_master_key_id = aws_kms_key.main.id
 }
 
-# --- Politique SNS pour CloudTrail (CORRECTION InsufficientSnsTopicPolicyException) ---
+# --- Politique SNS pour CloudTrail ---
 resource "aws_sns_topic_policy" "trail_sns_policy" {
   arn = aws_sns_topic.trail_alerts.arn
 
