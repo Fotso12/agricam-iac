@@ -23,6 +23,9 @@ resource "aws_instance" "web" {
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = var.instance_profile
 
+  # Force le remplacement de l'instance si le script user_data (ou le HTML) change
+  user_data_replace_on_change = true
+
   # CKV_AWS_126 : Monitoring détaillé
   monitoring = true
   # CKV_AWS_135 : Optimisation EBS
