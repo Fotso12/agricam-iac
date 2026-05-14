@@ -16,37 +16,37 @@ data "aws_ami" "amazon_linux_2" {
 
 # --- Instance EC2 ---
 resource "aws_instance" "web" {
+  # Utilisation de l'ID dynamique pour éviter l'erreur InvalidAMIID.Malformed
   ami                    = data.aws_ami.amazon_linux_2.id
   instance_type          = var.instance_type
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = var.instance_profile
 
-  # Indispensable pour que Terraform remplace l'instance quand le HTML ou l'image change
+  # Force le remplacement de l'instance si le script user_data (ou le HTML) change
   user_data_replace_on_change = true
 
-  monitoring    = true
+  # CKV_AWS_126 : Monitoring détaillé
+  monitoring = true
+  # CKV_AWS_135 : Optimisation EBS
   ebs_optimized = true
 
+  # Script d'initialisation pour Nginx et le contenu HTML
   user_data = <<-EOT
     #!/bin/bash
-    # Version Deploy: Portfolio-v4-Fixed
+    # Version Deploy: Portfolio-v5-Final
     yum update -y
     amazon-linux-extras install nginx1 -y
     systemctl enable nginx
     systemctl start nginx
     
-    # Injection du HTML (Fichier texte)
+    # On injecte le contenu du fichier index.html situé dans le même dossier
     cat <<EOF > /usr/share/nginx/html/index.html
     ${file("${path.module}/index.html")}
     EOF
-
-    # Injection de la photo (Fichier binaire corrigé avec filebase64)
-    echo "${filebase64("${path.module}/darryl.jpg")}" | base64 -d > /usr/share/nginx/html/darryl.jpg
     
-    # Fix des permissions pour Nginx
+    # On s'assure que les permissions sont correctes pour Nginx
     chmod 644 /usr/share/nginx/html/index.html
-    chmod 644 /usr/share/nginx/html/darryl.jpg
   EOT
 
   root_block_device {
@@ -54,17 +54,20 @@ resource "aws_instance" "web" {
     volume_size           = 20
     delete_on_termination = true
     encrypted             = true
-    kms_key_id            = var.kms_key_arn
+    # CKV_AWS_3 & CKV_AWS_8 : Utilisation de la clé KMS pour le chiffrement du volume
+    kms_key_id = var.kms_key_arn
   }
 
   metadata_options {
+    # CKV_AWS_79 : IMDSv2 est requis
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 1
   }
 
+  # Tags pour l'identification et le forçage du cycle de vie
   tags = { 
-    Name       = "${var.projet}-serveur-${var.environnement}" 
-    Deployment = "Portfolio-Final"
+    Name        = "${var.projet}-serveur-${var.environnement}"
+    Deployment  = "Portfolio-v5"
   }
 }
