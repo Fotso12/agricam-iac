@@ -30,21 +30,21 @@ resource "aws_instance" "web" {
 
   user_data = <<-EOT
     #!/bin/bash
-    # Version Deploy: Portfolio-v3
+    # Version Deploy: Portfolio-v4-Fixed
     yum update -y
     amazon-linux-extras install nginx1 -y
     systemctl enable nginx
     systemctl start nginx
     
-    # Injection du HTML
+    # Injection du HTML (Fichier texte)
     cat <<EOF > /usr/share/nginx/html/index.html
     ${file("${path.module}/index.html")}
     EOF
 
-    # Injection de la photo (conversion du binaire en texte pour le transit)
-    echo "${base64encode(file("${path.module}/darryl.jpg"))}" | base64 -d > /usr/share/nginx/html/darryl.jpg
+    # Injection de la photo (Fichier binaire corrigé avec filebase64)
+    echo "${filebase64("${path.module}/darryl.jpg")}" | base64 -d > /usr/share/nginx/html/darryl.jpg
     
-    # Fix des permissions
+    # Fix des permissions pour Nginx
     chmod 644 /usr/share/nginx/html/index.html
     chmod 644 /usr/share/nginx/html/darryl.jpg
   EOT
