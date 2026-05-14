@@ -15,6 +15,7 @@ env:
 
 jobs:
   # --- JOB 1 : INSTALLATION ET VALIDATION ---
+  # Vérifie la syntaxe et le style du code Terraform
   installation_et_validation:
     name: 🛠️ Installation & Validation
     runs-on: ubuntu-latest
@@ -26,6 +27,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
       - name: Vérification du format (Style)
         run: terraform fmt -check -recursive
@@ -40,10 +42,11 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
 
   # --- JOB 2 : SCAN DE SÉCURITÉ ---
+  # Analyse les vulnérabilités et le respect des bonnes pratiques
   securite_et_lint:
     name: 🛡️ Scan Sécurité (Checkov & TFLint)
     runs-on: ubuntu-latest
-    needs: installation_et_validation # Ne se lance que si la validation syntaxique passe
+    needs: installation_et_validation
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -53,16 +56,21 @@ jobs:
         with:
           directory: .
           framework: terraform
-          soft_fail: false # Bloque le pipeline en cas d'erreur critique
+          soft_fail: false # Bloque si une erreur de sécurité non-ignorée est trouvée
 
-      - name: TFLint (Meilleures pratiques)
+      - name: Installation TFLint
         uses: terraform-linters/setup-tflint@v4
-      - run: tflint --init && tflint --recursive
+      
+      - name: Exécution TFLint
+        run: |
+          tflint --init
+          tflint --recursive
         working-directory: ${{ env.WORKING_DIR }}
 
   # --- JOB 3 : PLANIFICATION (CONFIGURATION) ---
+  # Prépare les changements sans les appliquer
   configuration_plan:
-    name: 📝 Planification de l'Infrastructure
+    name: 📝 Planification
     runs-on: ubuntu-latest
     needs: securite_et_lint
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -72,6 +80,12 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
+      - name: Installation Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
       - name: Configuration AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -79,7 +93,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Terraform Init (Complet)
+      - name: Terraform Init
         run: terraform init
         working-directory: ${{ env.WORKING_DIR }}
 
@@ -91,25 +105,33 @@ jobs:
             -out=tfplan \
             -detailed-exitcode
         working-directory: ${{ env.WORKING_DIR }}
-        continue-on-error: true # On continue pour pouvoir capturer l'exitcode
+        continue-on-error: true
 
-      - name: Upload de l'artefact Plan
+      - name: Sauvegarde du Plan (Artefact)
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
           path: ${{ env.WORKING_DIR }}/tfplan
+          retention-days: 1
 
   # --- JOB 4 : DÉPLOIEMENT ---
+  # Applique les changements sur l'infrastructure réelle
   deploiement:
     name: 🚀 Déploiement Production
     runs-on: ubuntu-latest
     needs: configuration_plan
-    # Ne se lance que sur le main, si des changements sont détectés (exitcode 2)
+    # Se lance uniquement sur 'main' si des changements ont été détectés (Exit Code 2)
     if: github.ref == 'refs/heads/main' && needs.configuration_plan.outputs.plan_exit_code == '2'
     environment: production
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
+
+      - name: Installation Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
       - name: Configuration AWS
         uses: aws-actions/configure-aws-credentials@v4
@@ -117,9 +139,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Installation Terraform
-        uses: hashicorp/setup-terraform@v3
 
       - name: Récupération du Plan
         uses: actions/download-artifact@v4
