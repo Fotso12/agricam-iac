@@ -21,11 +21,11 @@ resource "aws_flow_log" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "flow_log" {
-  name              = "/aws/vpc-flow-log/${var.projet}-${var.environnement}"
+  name = "/aws/vpc-flow-log/${var.projet}-${var.environnement}"
   # CKV_AWS_338 : Rétention d'un an minimum
   retention_in_days = 365
   # CKV_AWS_158 : Chiffrement KMS obligatoire
-  kms_key_id        = var.kms_key_arn 
+  kms_key_id = var.kms_key_arn
 }
 
 resource "aws_iam_role" "flow_log_role" {
@@ -33,8 +33,8 @@ resource "aws_iam_role" "flow_log_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "vpc-flow-logs.amazonaws.com" }
     }]
   })
@@ -52,7 +52,7 @@ resource "aws_iam_role_policy" "flow_log_policy" {
         "logs:DescribeLogGroups",
         "logs:DescribeLogStreams"
       ]
-      Effect   = "Allow"
+      Effect = "Allow"
       # CKV_AWS_290 & CKV_AWS_355 : Restriction à la ressource spécifique
       Resource = "${aws_cloudwatch_log_group.flow_log.arn}:*"
     }]
@@ -64,7 +64,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_cidr
   availability_zone       = "${var.region}a"
-  map_public_ip_on_launch = false 
+  map_public_ip_on_launch = false
 
   tags = { Name = "${var.projet}-subnet-public-${var.environnement}" }
 }

@@ -7,9 +7,9 @@ resource "aws_instance" "web" {
   iam_instance_profile   = var.instance_profile
 
   # CKV_AWS_126 : Monitoring détaillé
-  monitoring    = true 
+  monitoring = true
   # CKV_AWS_135 : Optimisation EBS
-  ebs_optimized = true 
+  ebs_optimized = true
 
   user_data = <<-EOT
     #!/bin/bash
@@ -24,15 +24,15 @@ resource "aws_instance" "web" {
     volume_type           = "gp3"
     volume_size           = 20
     delete_on_termination = true
-    encrypted             = true 
+    encrypted             = true
     # CKV_AWS_3 & CKV_AWS_8 : Utilisation de la clé KMS pour le chiffrement du volume
-    kms_key_id            = var.kms_key_arn
+    kms_key_id = var.kms_key_arn
   }
 
   metadata_options {
     # CKV_AWS_79 : IMDSv2 est requis
     http_endpoint               = "enabled"
-    http_tokens                 = "required" 
+    http_tokens                 = "required"
     http_put_response_hop_limit = 1
   }
 

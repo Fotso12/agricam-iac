@@ -8,7 +8,7 @@ module "securite" {
 }
 
 module "reseau" {
-  source        = "../../modules/reseau"
+  source = "../../modules/reseau"
   # Injection de la clé KMS provenant du module sécurité
   kms_key_arn   = module.securite.kms_key_arn
   projet        = var.projet
@@ -28,7 +28,7 @@ module "serveur_web" {
   security_group_id = module.reseau.security_group_id
   instance_profile  = module.securite.instance_profile_name
   # Ajout du KMS ARN pour le chiffrement des disques EBS
-  kms_key_arn       = module.securite.kms_key_arn
+  kms_key_arn = module.securite.kms_key_arn
 
   depends_on = [module.reseau, module.securite]
 }

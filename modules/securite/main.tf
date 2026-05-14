@@ -4,24 +4,24 @@ data "aws_caller_identity" "current" {}
 resource "aws_kms_key" "main" {
   description             = "Cle KMS pour AgriCam (S3, CloudTrail)"
   deletion_window_in_days = 10
-  enable_key_rotation     = true 
+  enable_key_rotation     = true
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "Enable IAM User Permissions"
-        Effect = "Allow"
+        Sid       = "Enable IAM User Permissions"
+        Effect    = "Allow"
         Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
-        Action   = "kms:*"
+        Action    = "kms:*"
         # CKV_AWS_356 : Autoriser l'accès complet uniquement aux admins du compte via l'IAM root
-        Resource = "*" 
+        Resource = "*"
       },
       {
-        Sid    = "Allow CloudTrail to encrypt logs"
-        Effect = "Allow"
+        Sid       = "Allow CloudTrail to encrypt logs"
+        Effect    = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = "kms:GenerateDataKey*"
-        Resource = "*"
+        Action    = "kms:GenerateDataKey*"
+        Resource  = "*"
       }
     ]
   })
@@ -55,7 +55,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "stockage" {
   rule {
     id     = "archive-and-cleanup"
     status = "Enabled"
-    filter {} 
+    filter {}
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -68,9 +68,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "stockage" {
 }
 
 resource "aws_s3_bucket_logging" "stockage" {
-  bucket         = aws_s3_bucket.stockage.id
-  target_bucket  = aws_s3_bucket.logs.id
-  target_prefix  = "log/stockage/"
+  bucket        = aws_s3_bucket.stockage.id
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "log/stockage/"
 }
 
 resource "aws_s3_bucket_public_access_block" "stockage" {
@@ -144,18 +144,18 @@ resource "aws_s3_bucket_policy" "logs" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AWSCloudTrailAclCheck"
-        Effect = "Allow"
+        Sid       = "AWSCloudTrailAclCheck"
+        Effect    = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.logs.arn
+        Action    = "s3:GetBucketAcl"
+        Resource  = aws_s3_bucket.logs.arn
       },
       {
-        Sid    = "AWSCloudTrailWrite"
-        Effect = "Allow"
+        Sid       = "AWSCloudTrailWrite"
+        Effect    = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.logs.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.logs.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
         Condition = {
           StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" }
         }
@@ -166,11 +166,11 @@ resource "aws_s3_bucket_policy" "logs" {
 
 # --- CloudWatch Logs pour CloudTrail ---
 resource "aws_cloudwatch_log_group" "trail" {
-  name              = "/aws/cloudtrail/${var.projet}-audit"
+  name = "/aws/cloudtrail/${var.projet}-audit"
   # CKV_AWS_338 : Rétention augmentée à 1 an
   retention_in_days = 365
   # CKV_AWS_158 : Chiffrement KMS ajouté
-  kms_key_id        = aws_kms_key.main.arn
+  kms_key_id = aws_kms_key.main.arn
 }
 
 # --- SNS pour CloudTrail ---
@@ -181,13 +181,13 @@ resource "aws_sns_topic" "trail_alerts" {
 
 # --- AWS CloudTrail ---
 resource "aws_cloudtrail" "audit" {
-  name                          = "${var.projet}-trail-${var.environnement}"
-  s3_bucket_name                = aws_s3_bucket.logs.id
-  kms_key_id                    = aws_kms_key.main.arn 
-  sns_topic_name                = aws_sns_topic.trail_alerts.name 
-  cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.trail.arn}:*" 
-  cloud_watch_logs_role_arn      = aws_iam_role.trail_to_cw.arn
-  
+  name                       = "${var.projet}-trail-${var.environnement}"
+  s3_bucket_name             = aws_s3_bucket.logs.id
+  kms_key_id                 = aws_kms_key.main.arn
+  sns_topic_name             = aws_sns_topic.trail_alerts.name
+  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.trail.arn}:*"
+  cloud_watch_logs_role_arn  = aws_iam_role.trail_to_cw.arn
+
   is_multi_region_trail         = true
   enable_log_file_validation    = true
   include_global_service_events = true
@@ -207,8 +207,8 @@ resource "aws_iam_role" "trail_to_cw" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "cloudtrail.amazonaws.com" }
     }]
   })
