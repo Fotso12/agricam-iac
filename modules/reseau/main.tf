@@ -61,6 +61,7 @@ resource "aws_iam_role_policy" "flow_log_policy" {
 
 # --- Sous-réseau ---
 resource "aws_subnet" "public" {
+  # checkov:skip=CKV_AWS_130: Attribution d'IP publique nécessaire pour accéder à la page de félicitations sans Load Balancer
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_cidr
   availability_zone       = "${var.region}a"
