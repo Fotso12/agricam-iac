@@ -52,6 +52,9 @@ resource "aws_kms_key" "main" {
 resource "aws_s3_bucket" "stockage" {
   bucket = "${var.projet}-stockage-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-stockage-${var.environnement}" }
+
+  # checkov:skip=CKV_AWS_144:La réplication cross-region n'est pas requise pour AgriCam
+  # checkov:skip=CKV2_AWS_62:Les notifications d'événements ne sont pas nécessaires pour ce cas d'usage
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "stockage" {
@@ -93,7 +96,7 @@ resource "aws_s3_bucket_logging" "stockage" {
 
 resource "aws_s3_bucket_public_access_block" "stockage" {
   bucket                  = aws_s3_bucket.stockage.id
-  block_public_acls       = true
+  block_public_acls        = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
@@ -103,6 +106,9 @@ resource "aws_s3_bucket_public_access_block" "stockage" {
 resource "aws_s3_bucket" "logs" {
   bucket = "${var.projet}-cloudtrail-logs-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-cloudtrail-logs-${var.environnement}", Type = "Logs" }
+
+  # checkov:skip=CKV_AWS_144:Bucket de logs local uniquement pour archivage
+  # checkov:skip=CKV2_AWS_62:Pas de traitement automatisé des logs S3 prévu
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
@@ -141,7 +147,7 @@ resource "aws_s3_bucket_versioning" "logs" {
 
 resource "aws_s3_bucket_public_access_block" "logs" {
   bucket                  = aws_s3_bucket.logs.id
-  block_public_acls       = true
+  block_public_acls        = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
