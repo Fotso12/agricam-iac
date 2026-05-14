@@ -12,7 +12,6 @@ resource "aws_kms_key" "main" {
       {
         Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
-        # Cette section donne au compte Root et à l'utilisateur actuel le contrôle total
         Principal = {
           AWS = [
             "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
@@ -23,8 +22,8 @@ resource "aws_kms_key" "main" {
         Resource = "*"
       },
       {
-        Sid       = "Allow CloudTrail to encrypt logs"
-        Effect    = "Allow"
+        Sid    = "Allow CloudTrail to encrypt logs"
+        Effect = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
         Action = [
           "kms:GenerateDataKey*",
@@ -55,9 +54,6 @@ resource "aws_kms_key" "main" {
 resource "aws_s3_bucket" "stockage" {
   bucket = "${var.projet}-stockage-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-stockage-${var.environnement}" }
-
-  # checkov:skip=CKV_AWS_144:La réplication cross-region n'est pas requise pour AgriCam
-  # checkov:skip=CKV2_AWS_62:Les notifications d'événements ne sont pas nécessaires pour ce cas d'usage
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "stockage" {
@@ -109,9 +105,6 @@ resource "aws_s3_bucket_public_access_block" "stockage" {
 resource "aws_s3_bucket" "logs" {
   bucket = "${var.projet}-cloudtrail-logs-${var.environnement}-${var.suffix}"
   tags   = { Name = "${var.projet}-cloudtrail-logs-${var.environnement}", Type = "Logs" }
-
-  # checkov:skip=CKV_AWS_144:Bucket de logs local uniquement pour archivage
-  # checkov:skip=CKV2_AWS_62:Pas de traitement automatisé des logs S3 prévu
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
@@ -195,6 +188,24 @@ resource "aws_sns_topic" "trail_alerts" {
   kms_master_key_id = aws_kms_key.main.id
 }
 
+# --- Politique SNS pour CloudTrail (CORRECTION InsufficientSnsTopicPolicyException) ---
+resource "aws_sns_topic_policy" "trail_sns_policy" {
+  arn = aws_sns_topic.trail_alerts.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudTrailPublish"
+        Effect = "Allow"
+        Principal = { Service = "cloudtrail.amazonaws.com" }
+        Action   = "SNS:Publish"
+        Resource = aws_sns_topic.trail_alerts.arn
+      }
+    ]
+  })
+}
+
 # --- AWS CloudTrail ---
 resource "aws_cloudtrail" "audit" {
   name                          = "${var.projet}-trail-${var.environnement}"
@@ -202,15 +213,17 @@ resource "aws_cloudtrail" "audit" {
   kms_key_id                    = aws_kms_key.main.arn
   sns_topic_name                = aws_sns_topic.trail_alerts.name
   cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.trail.arn}:*"
-  cloud_watch_logs_role_arn      = aws_iam_role.trail_to_cw.arn
+  cloud_watch_logs_role_arn     = aws_iam_role.trail_to_cw.arn
   is_multi_region_trail         = true
   enable_log_file_validation    = true
   include_global_service_events = true
+  
   event_selector {
     read_write_type           = "All"
     include_management_events = true
   }
-  depends_on = [aws_s3_bucket_policy.logs]
+
+  depends_on = [aws_s3_bucket_policy.logs, aws_sns_topic_policy.trail_sns_policy]
   tags       = { Type = "Securite" }
 }
 
@@ -224,6 +237,25 @@ resource "aws_iam_role" "trail_to_cw" {
       Effect    = "Allow"
       Principal = { Service = "cloudtrail.amazonaws.com" }
     }]
+  })
+}
+
+resource "aws_iam_role_policy" "trail_to_cw_policy" {
+  name = "${var.projet}-cloudtrail-to-cw-policy"
+  role = aws_iam_role.trail_to_cw.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.trail.arn}:*"
+      }
+    ]
   })
 }
 
