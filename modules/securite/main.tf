@@ -12,9 +12,12 @@ resource "aws_kms_key" "main" {
       {
         Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
-        # Cette section donne au compte Root le contrôle total pour éviter le verrouillage (Safety Check)
+        # Cette section donne au compte Root et à l'utilisateur actuel le contrôle total
         Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+          AWS = [
+            "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
+            data.aws_caller_identity.current.arn
+          ]
         }
         Action   = "kms:*"
         Resource = "*"
@@ -96,7 +99,7 @@ resource "aws_s3_bucket_logging" "stockage" {
 
 resource "aws_s3_bucket_public_access_block" "stockage" {
   bucket                  = aws_s3_bucket.stockage.id
-  block_public_acls        = true
+  block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
@@ -147,7 +150,7 @@ resource "aws_s3_bucket_versioning" "logs" {
 
 resource "aws_s3_bucket_public_access_block" "logs" {
   bucket                  = aws_s3_bucket.logs.id
-  block_public_acls        = true
+  block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
@@ -199,7 +202,7 @@ resource "aws_cloudtrail" "audit" {
   kms_key_id                    = aws_kms_key.main.arn
   sns_topic_name                = aws_sns_topic.trail_alerts.name
   cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.trail.arn}:*"
-  cloud_watch_logs_role_arn     = aws_iam_role.trail_to_cw.arn
+  cloud_watch_logs_role_arn      = aws_iam_role.trail_to_cw.arn
   is_multi_region_trail         = true
   enable_log_file_validation    = true
   include_global_service_events = true
