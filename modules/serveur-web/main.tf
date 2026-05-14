@@ -34,6 +34,7 @@ resource "aws_instance" "web" {
   # Script d'initialisation pour Nginx et le contenu HTML
   user_data = <<-EOT
     #!/bin/bash
+    # Version Deploy: 2026-05-14_V1 (Ce commentaire force le refresh Terraform)
     yum update -y
     amazon-linux-extras install nginx1 -y
     systemctl enable nginx
@@ -43,6 +44,9 @@ resource "aws_instance" "web" {
     cat <<EOF > /usr/share/nginx/html/index.html
     ${file("${path.module}/index.html")}
     EOF
+    
+    # On s'assure que les permissions sont correctes pour Nginx
+    chmod 644 /usr/share/nginx/html/index.html
   EOT
 
   root_block_device {
@@ -61,5 +65,9 @@ resource "aws_instance" "web" {
     http_put_response_hop_limit = 1
   }
 
-  tags = { Name = "${var.projet}-serveur-${var.environnement}" }
+  # Changement du tag pour forcer Terraform à recréer la ressource si nécessaire
+  tags = { 
+    Name        = "${var.projet}-serveur-${var.environnement}"
+    Deployment  = "NewUI-v2"
+  }
 }
