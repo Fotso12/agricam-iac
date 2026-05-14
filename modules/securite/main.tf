@@ -13,17 +13,17 @@ resource "aws_kms_key" "main" {
         Sid    = "Enable IAM User Permissions"
         Effect = "Allow"
         # Cette section donne au compte Root le contrôle total pour éviter le verrouillage (Safety Check)
-        Principal = { 
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" 
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
         Action   = "kms:*"
         Resource = "*"
       },
       {
-        Sid    = "Allow CloudTrail to encrypt logs"
-        Effect = "Allow"
+        Sid       = "Allow CloudTrail to encrypt logs"
+        Effect    = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action   = [
+        Action = [
           "kms:GenerateDataKey*",
           "kms:DescribeKey"
         ]
@@ -32,8 +32,8 @@ resource "aws_kms_key" "main" {
       {
         Sid    = "Allow CloudWatch Logs to use the key"
         Effect = "Allow"
-        Principal = { 
-          Service = "logs.${var.aws_region}.amazonaws.com" 
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
         }
         Action = [
           "kms:Encrypt*",
@@ -175,9 +175,9 @@ resource "aws_s3_bucket_policy" "logs" {
 
 # --- CloudWatch Logs pour CloudTrail ---
 resource "aws_cloudwatch_log_group" "trail" {
-  name = "/aws/cloudtrail/${var.projet}-audit"
+  name              = "/aws/cloudtrail/${var.projet}-audit"
   retention_in_days = 365
-  kms_key_id = aws_kms_key.main.arn
+  kms_key_id        = aws_kms_key.main.arn
 }
 
 # --- SNS pour CloudTrail ---
@@ -188,12 +188,12 @@ resource "aws_sns_topic" "trail_alerts" {
 
 # --- AWS CloudTrail ---
 resource "aws_cloudtrail" "audit" {
-  name                       = "${var.projet}-trail-${var.environnement}"
-  s3_bucket_name             = aws_s3_bucket.logs.id
-  kms_key_id                 = aws_kms_key.main.arn
-  sns_topic_name             = aws_sns_topic.trail_alerts.name
-  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.trail.arn}:*"
-  cloud_watch_logs_role_arn  = aws_iam_role.trail_to_cw.arn
+  name                          = "${var.projet}-trail-${var.environnement}"
+  s3_bucket_name                = aws_s3_bucket.logs.id
+  kms_key_id                    = aws_kms_key.main.arn
+  sns_topic_name                = aws_sns_topic.trail_alerts.name
+  cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.trail.arn}:*"
+  cloud_watch_logs_role_arn     = aws_iam_role.trail_to_cw.arn
   is_multi_region_trail         = true
   enable_log_file_validation    = true
   include_global_service_events = true

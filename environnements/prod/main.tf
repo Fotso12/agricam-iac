@@ -2,7 +2,7 @@
 
 module "securite" {
   source        = "../../modules/securite"
-  aws_region = var.aws_region
+  aws_region    = var.aws_region
   projet        = var.projet
   environnement = var.environnement
   suffix        = "a1b2c3" # Assurez-vous que ce suffixe est unique globalement pour S3
