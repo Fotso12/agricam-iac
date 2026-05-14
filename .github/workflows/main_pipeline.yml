@@ -17,7 +17,7 @@ jobs:
   # --- JOB 1 : INSTALLATION ET VALIDATION ---
   # Vérifie la syntaxe et le style du code Terraform
   installation_et_validation:
-    name: 🛠️ Installation & Validation
+    name: Installation & Validation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout du code
@@ -44,7 +44,7 @@ jobs:
   # --- JOB 2 : SCAN DE SÉCURITÉ ---
   # Analyse les vulnérabilités et le respect des bonnes pratiques
   securite_et_lint:
-    name: 🛡️ Scan Sécurité (Checkov & TFLint)
+    name: Scan Sécurité (Checkov & TFLint)
     runs-on: ubuntu-latest
     needs: installation_et_validation
     steps:
@@ -70,7 +70,7 @@ jobs:
   # --- JOB 3 : PLANIFICATION (CONFIGURATION) ---
   # Prépare les changements sans les appliquer
   configuration_plan:
-    name: 📝 Planification
+    name: Planification
     runs-on: ubuntu-latest
     needs: securite_et_lint
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -117,7 +117,7 @@ jobs:
   # --- JOB 4 : DÉPLOIEMENT ---
   # Applique les changements sur l'infrastructure réelle
   deploiement:
-    name: 🚀 Déploiement Production
+    name: Déploiement Production
     runs-on: ubuntu-latest
     needs: configuration_plan
     # Se lance uniquement sur 'main' si des changements ont été détectés (Exit Code 2)

@@ -11,13 +11,18 @@ resource "aws_instance" "web" {
   # CKV_AWS_135 : Optimisation EBS
   ebs_optimized = true
 
+  # Modification ici pour injecter ton fichier index.html
   user_data = <<-EOT
     #!/bin/bash
     apt-get update -y
     apt-get install -y nginx amazon-ssm-agent
     systemctl enable nginx amazon-ssm-agent
     systemctl start nginx amazon-ssm-agent
-    echo '<h1>AgriCam - Infrastructure IaC Operationnelle</h1>' > /var/www/html/index.html
+    
+    # On injecte le contenu du fichier index.html situé dans le même dossier
+    cat <<EOF > /var/www/html/index.html
+    ${file("${path.module}/index.html")}
+    EOF
   EOT
 
   root_block_device {

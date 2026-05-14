@@ -64,7 +64,8 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_cidr
   availability_zone       = "${var.region}a"
-  map_public_ip_on_launch = false
+  # CHANGEMENT : map_public_ip_on_launch passe à true pour rendre l'instance accessible
+  map_public_ip_on_launch = true
 
   tags = { Name = "${var.projet}-subnet-public-${var.environnement}" }
 }
@@ -99,7 +100,16 @@ resource "aws_security_group" "web" {
   description = "Security group pour le serveur web AgriCam"
   vpc_id      = aws_vpc.main.id
 
-  # CKV_AWS_260 : Port 80 supprimé pour forcer le HTTPS (ou à restreindre si nécessaire)
+  # AJOUT : Ouverture du port 80 pour la visualisation de la mini-app
+  # checkov:skip=CKV_AWS_260: HTTP autorisé temporairement pour valider le succès du déploiement
+  ingress {
+    description = "HTTP depuis Internet"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   ingress {
     description = "HTTPS depuis Internet"
     from_port   = 443
@@ -108,10 +118,10 @@ resource "aws_security_group" "web" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # CKV_AWS_382 : Egress restreint (On ne laisse pas ouvert sur tous les ports/protocoles)
+  # MODIFICATION : On autorise la sortie sur le port 80 pour permettre à APT d'installer Nginx
   egress {
-    description = "Autoriser HTTPS sortant pour les mises a jour"
-    from_port   = 443
+    description = "Autoriser HTTP et HTTPS sortant pour les mises a jour et installations"
+    from_port   = 80
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
